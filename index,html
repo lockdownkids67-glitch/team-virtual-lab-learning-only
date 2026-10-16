@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Arduino Virtual Lab</title>
+
+<style>
+:root {
+  --bg: #07111b;
+  --panel: #112131;
+  --panel2: #1a3043;
+  --green: #00ffad;
+  --blue: #54c7ff;
+  --text: #edf6ff;
+  --muted: #b3c5d5;
+  --red: #ff7474;
+}
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+}
+header {
+  text-align: center;
+  padding: 28px 15px;
+  background: linear-gradient(135deg,#003b34,#102b45);
+  border-bottom: 2px solid var(--green);
+}
+header h1 { color: var(--green); margin: 0; }
+header p { color: var(--muted); }
+
+main { max-width: 1100px; margin: auto; padding: 16px; }
+
+.card {
+  background: var(--panel);
+  border: 1px solid #294156;
+  padding: 20px;
+  border-radius: 12px;
+  margin: 18px 0;
+}
+h2 { color: var(--green); }
+h3 { color: var(--blue); }
+
+select, input {
+  width: 100%;
+  background: #07121c;
+  color: white;
+  border: 1px solid #476176;
+  border-radius: 7px;
+  padding: 12px;
+  margin: 6px 0 12px;
+}
+button {
+  background: var(--green);
+  color: #04140e;
+  border: 0;
+  border-radius: 7px;
+  padding: 11px 15px;
+  font-weight: bold;
+  cursor: pointer;
+  margin: 4px;
+}
+button.secondary {
+  background: #29465b;
+  color: white;
+}
+button:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit,minmax(220px,1fr));
+  gap: 12px;
+}
+.tile {
+  background: var(--panel2);
+  border-radius: 8px;
+  padding: 14px;
+}
+.board {
+  background: #173b32;
+  border: 2px solid #44c69a;
+  border-radius: 12px;
+  padding: 18px;
+  text-align: center;
+}
+.pin {
+  display: inline-block;
+  padding: 8px;
+  margin: 4px;
+  border-radius: 5px;
+  background: #07111b;
+  border: 1px solid #54746d;
+  color: var(--green);
+}
+pre {
+  background: #03080e;
+  color: #a7ffd5;
+  padding: 15px;
+  overflow-x: auto;
+  border-radius: 8px;
+  border: 1px solid #2a4053;
+}
+.note {
+  border-left: 4px solid var(--green);
+  background: #0a302a;
+  padding: 12px;
+}
+.error {
+  border-left: 4px solid var(--red);
+  background: #351b24;
+  padding: 12px;
+}
+.good {
+  border-left: 4px solid var(--green);
+  background: #0a302a;
+  padding: 12px;
+}
+.connection {
+  background: #1a3043;
+  border-radius: 8px;
+  padding: 12px;
+  margin: 10px 0;
+}
+.small { color: var(--muted); font-size: 14px; }
+footer {
+  text-align: center;
+  padding: 25px;
+  color: var(--muted);
+  background: #0c1925;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <h1>⚡ ARDUINO VIRTUAL LAB</h1>
+  <p>Build the circuit yourself. Understand every connection.</p>
+</header>
+
+<main>
+
+<section class="card">
+  <h2>Welcome, Engineer!</h2>
+  <p>
+    Select a project, inspect its components, and make connections
+    yourself. Ask for help whenever you need it.
+  </p>
+  <div class="note">
+    Learning mode: this website checks the connections you enter
+    against the project's expected wiring. It does not electrically
+    simulate a real Arduino or automatically inspect physical wiring.
+  </div>
+</section>
+
+<section class="card">
+  <h2>1. Select Your Project</h2>
+  <select id="project" onchange="loadProject()">
+    <option value="led">💡 Project 1 — LED Blinking</option>
+    <option value="traffic">🚦 Project 2 — Traffic Lights</option>
+    <option value="button">🔘 Project 3 — Button-Controlled LED</option>
+    <option value="ldr">🌞 Project 4 — Automatic Night Light</option>
+  </select>
+  <div id="projectInfo"></div>
+</section>
+
+<section class="card">
+  <h2>2. Your Virtual Components</h2>
+  <div id="components" class="grid"></div>
+
+  <h3>Arduino Uno pin reference</h3>
+  <div class="board">
+    <strong>ARDUINO UNO R3</strong>
+    <p>Digital pins</p>
+    <div id="digitalPins"></div>
+    <p>Analog pins</p>
+    <div id="analogPins"></div>
+    <p class="small">Pin labels are a learning reference, not a physical simulation.</p>
+  </div>
+</section>
+
+<section class="card">
+  <h2>3. Make Your Own Connections</h2>
+  <p>
+    Choose the starting component and terminal, then choose the
+    destination component and terminal.
+  </p>
+
+  <label>From component</label>
+  <select id="fromComponent"></select>
+
+  <label>From terminal</label>
+  <select id="fromTerminal"></select>
+
+  <label>To component</label>
+  <select id="toComponent"></select>
+
+  <label>To terminal</label>
+  <select id="toTerminal"></select>
+
+  <button onclick="addConnection()">Connect Wire</button>
+  <button class="secondary" onclick="undoConnection()">Undo Last Wire</button>
+  <button class="secondary" onclick="resetWiring()">Clear All Wires</button>
+
+  <h3>Your connections</h3>
+  <div id="connections"></div>
+
+  <h3>Check Your Wiring</h3>
+  <button onclick="checkWiring()">Check Connections</button>
+  <div id="feedback"></div>
+</section>
+
+<section class="card">
+  <h2>4. Step-by-Step Guide</h2>
+  <p>Follow the steps in order. Make each connection yourself.</p>
+  <div id="steps"></div>
+  <button onclick="previousStep()" class="secondary">Previous</button>
+  <button onclick="nextStep()">Next Step</button>
+</section>
+
+<section class="card">
+  <h2>5. Need Help?</h2>
+  <p>
+    Select a connection to learn how it works or why it may be wrong.
+  </p>
+
+  <select id="helpTopic">
+    <option value="led">How does an LED connection work?</option>
+    <option value="gnd">What is GND?</option>
+    <option value="resistor">Why use a resistor?</option>
+    <option value="input">What is an input pin?</option>
+    <option value="ldr">How does an LDR work?</option>
+  </select>
+
+  <button onclick="showHelp()">Explain This</button>
+  <div id="helpAnswer"></div>
+
+  <p class="small">
+    You can also ask ChatGPT: "In my Arduino Virtual Lab, how do I
+    connect [component terminal] to [Arduino pin]? Explain why."
+  </p>
+</section>
+
+<section class="card">
+  <h2>6. Project Code</h2>
+  <p>
+    First learn the wiring. Then copy the program and upload it
+    to your Arduino Uno using the Arduino IDE.
+  </p>
+
+  <pre><code id="code"></code></pre>
+  <button onclick="copyCode()">📋 Copy Code</button>
+  <span id="copyStatus"></span>
+
+  <h3>How the code works</h3>
+  <div id="codeExplanation"></div>
+</section>
+
+<section class="card">
+  <h2>7. Engineer's Checklist</h2>
+  <ul>
+    <li>Have I selected the correct Arduino pin?</li>
+    <li>Is the LED polarity correct?</li>
+    <li>Is the resistor connected in series with the LED?</li>
+    <li>Is GND connected where required?</li>
+    <li>Have I selected the correct board and port?</li>
+    <li>Do I understand what each line of code does?</li>
+  </ul>
+</section>
+
+</main>
+
+<footer>
+  ARDUINO VIRTUAL LAB · Learn by building
+</footer>
+
+<script>
+const projects = {
+  led: {
+    title: "LED Blinking",
+    description: "Make one LED turn on and off repeatedly.",
+    parts: [
+      ["Arduino Uno", "Board"],
+      ["LED", "Anode (+), Cathode (-)"],
+      ["330Ω resistor", "Terminal 1, Terminal 2"],
+      ["Breadboard", "Connection points"]
+    ],
+    terminals: {
+      "Arduino Uno": ["D7", "GND", "5V", "D2", "A0"],
+      "LED": ["Anode (+)", "Cathode (-)"],
+      "330Ω resistor": ["Terminal 1", "Terminal 2"],
+      "Breadboard": ["Row A", "Row B", "Power rail +", "Power rail -"]
+    },
+    expected: [
+      ["Arduino Uno","D7","LED","Anode (+)"],
+      ["LED","Cathode (-)","330Ω resistor","Terminal 1"],
+      ["330Ω resistor","Terminal 2","Arduino Uno","GND"]
+    ],
+    steps: [
+      "Place the LED on the breadboard. Identify its anode and cathode.",
+      "Connect Arduino D7 to the LED anode.",
+      "Connect the LED cathode to one terminal of the resistor.",
+      "Connect the other resistor terminal to Arduino GND.",
+      "Check your wiring, then copy and upload the code."
+    ],
+    code: `void setup() {
+  pinMode(7, OUTPUT);
+}
+
+void loop() {
+  digitalWrite(7, HIGH);
+  delay(1000);
+
+  digitalWrite(7, LOW);
+  delay(1000);
+}`,
+    explanation: [
+      "setup() runs once after startup or reset.",
+      "pinMode(7, OUTPUT) configures pin 7 as an output.",
+      "HIGH sets the output high, allowing current to flow through the LED and resistor.",
+      "delay(1000) waits approximately one second.",
+      "LOW sets the output low. The LED turns off.",
+      "loop() repeats the sequence."
+    ]
+  },
+
+  traffic: {
+    title: "Traffic Light",
+    description: "Sequence red, yellow and green LEDs.",
+    parts: [
+      ["Arduino Uno","Board"],
+      ["Red LED","Anode (+), Cathode (-)"],
+      ["Yellow LED","Anode (+), Cathode (-)"],
+      ["Green LED","Anode (+), Cathode (-)"],
+      ["Red resistor","Terminal 1, Terminal 2"],
+      ["Yellow resistor","Terminal 1, Terminal 2"],
+      ["Green resistor","Terminal 1, Terminal 2"]
+    ],
+    terminals: {
+      "Arduino Uno":["D8","D7","D6","GND"],
+      "Red LED":["Anode (+)","Cathode (-)"],
+      "Yellow LED":["Anode (+)","Cathode (-)"],
+      "Green LED":["Anode (+)","Cathode (-)"],
+      "Red resistor":["Terminal 1","Terminal 2"],
+      "Yellow resistor":["Terminal 1","Terminal 2"],
+      "Green resistor":["Terminal 1","Terminal 2"]
+    },
+    expected: [
+      ["Arduino Uno","D8","Red LED","Anode (+)"],
+      ["Red LED","Cathode (-)","Red resistor","Terminal 1"],
+      ["Red resistor","Terminal 2","Arduino Uno","GND"],
+      ["Arduino Uno","D7","Yellow LED","Anode (+)"],
+      ["Yellow LED","Cathode (-)","Yellow resistor","Terminal 1"],
+      ["Yellow resistor","Terminal 2","Arduino Uno","GND"],
+      ["Arduino Uno","D6","Green LED","Anode (+)"],
+      ["Green LED","Cathode (-)","Green resistor","Terminal 1"],
+      ["Green resistor","Terminal 2","Arduino Uno","GND"]
+    ],
+    steps: [
+      "Place the red, yellow and green LEDs on the breadboard.",
+      "Connect D8 to the red LED anode.",
+      "Connect the red LED cathode through its own resistor to GND.",
+      "Repeat for yellow using D7 and green using D6.",
+      "Check all three separate LED-resistor circuits before powering on."
+    ],
+    code: `const int redLED = 8;
+const int yellowLED = 7;
+const int greenLED = 6;
+
+void setup() {
+  pinMode(redLED, OUTPUT);
+  pinMode(yellowLED, OUTPUT);
+  pinMode(greenLED, OUTPUT);
+}
+
+void loop() {
+  digitalWrite(redLED, HIGH);
+  digitalWrite(yellowLED, LOW);
+  digitalWrite(greenLED, LOW);
+  delay(3000);
+
+  digitalWrite(redLED, LOW);
+  digitalWrite(yellowLED, HIGH);
+  delay(1000);
+
+  digitalWrite(yellowLED, LOW);
+  digitalWrite(greenLED, HIGH);
+  delay(3000);
+
+  digitalWrite(greenLED, LOW);
+  digitalWrite(yellowLED, HIGH);
+  delay(1000);
+
+  digitalWrite(yellowLED, LOW);
+}`,
+    explanation: [
+      "Each variable stores the pin number for one LED.",
+      "setup() configures all three pins as outputs.",
+      "The program switches the red LED on for three seconds.",
+      "It switches to yellow for one second.",
+      "It switches to green for three seconds.",
+      "It displays yellow again before repeating."
+    ]
+  },
+
+  button: {
+    title: "Push-Button LED",
+    description: "Light the LED while a push button is pressed.",
+    parts: [
+      ["Arduino Uno","Board"],
+      ["Push button","Terminal 1, Terminal 2"],
+      ["LED","Anode (+), Cathode (-)"],
+      ["330Ω resistor","Terminal 1, Terminal 2"]
+    ],
+    terminals: {
+      "Arduino Uno":["D2","D7","GND"],
+      "Push button":["Terminal 1","Terminal 2"],
+      "LED":["Anode (+)","Cathode (-)"],
+      "330Ω resistor":["Terminal 1","Terminal 2"]
+    },
+    expected: [
+      ["Arduino Uno","D2","Push button","Terminal 1"],
+      ["Push button","Terminal 2","Arduino Uno","GND"],
+      ["Arduino Uno","D7","LED","Anode (+)"],
+      ["LED","Cathode (-)","330Ω resistor","Terminal 1"],
+      ["330Ω resistor","Terminal 2","Arduino Uno","GND"]
+    ],
+    steps: [
+      "Place the push button across the breadboard's centre gap.",
+      "Connect one button terminal to D2.",
+      "Connect the other button terminal to GND.",
+      "Connect D7 to the LED anode and the cathode through a resistor to GND.",
+      "The program uses INPUT_PULLUP, so the button reads LOW when pressed."
+    ],
+    code: `const int buttonPin = 2;
+const int ledPin = 7;
+
+void setup() {
+  pinMode(buttonPin, INPUT_PULLUP);
+  pinMode(ledPin, OUTPUT);
+}
+
+void loop() {
+  int buttonState = digitalRead(buttonPin);
+
+  if (buttonState == LOW) {
+    digitalWrite(ledPin, HIGH);
+  } else {
+    digitalWrite(ledPin, LOW);
+  }
+}`,
+    explanation: [
+      "buttonPin and ledPin store the two pin numbers.",
+      "INPUT_PULLUP enables an internal pull-up resistor.",
+      "digitalRead() reads the button's logic state.",
+      "Pressed means LOW because the button connects D2 to GND.",
+      "The if statement turns the LED on when pressed.",
+      "The else statement turns the LED off when released."
+    ]
+  },
+
+  ldr: {
+    title: "Automatic Night Light",
+    description: "Use an LDR voltage divider to sense light and control an LED.",
+    parts: [
+      ["Arduino Uno","Board"],
+      ["LDR","Terminal 1, Terminal 2"],
+      ["10kΩ resistor","Terminal 1, Terminal 2"],
+      ["LED","Anode (+), Cathode (-)"],
+      ["330Ω LED resistor","Terminal 1, Terminal 2"]
+    ],
+    terminals: {
+      "Arduino Uno":["A0","D7","5V","GND"],
+      "LDR":["Terminal 1","Terminal 2"],
+      "10kΩ resistor":["Terminal 1","Terminal 2"],
+      "LED":["Anode (+)","Cathode (-)"],
+      "330Ω LED resistor":["Terminal 1","Terminal 2"]
+    },
+    expected: [
+      ["Arduino Uno","5V","LDR","Terminal 1"],
+      ["LDR","Terminal 2","Arduino Uno","A0"],
+      ["LDR","Terminal 2","10kΩ resistor","Terminal 1"],
+      ["10kΩ resistor","Terminal 2","Arduino Uno","GND"],
+      ["Arduino Uno","D7","LED","Anode (+)"],
+      ["LED","Cathode (-)","330Ω LED resistor","Terminal 1"],
+      ["330Ω LED resistor","Terminal 2","Arduino Uno","GND"]
+    ],
+    steps: [
+      "Connect one LDR terminal to 5V.",
+      "Connect the other LDR terminal to A0. This junction is the sensor output.",
+      "Connect a 10kΩ resistor from the A0 junction to GND.",
+      "Connect D7 to the LED anode and the LED cathode through a 330Ω resistor to GND.",
+      "The example turns the LED on when the measured voltage is below the selected threshold. Test and adjust the threshold for your room."
+    ],
+    code: `const int ldrPin = A0;
+const int ledPin = 7;
+const int threshold = 400;
+
+void setup() {
+  pinMode(ledPin, OUTPUT);
+  Serial.begin(9600);
+}
+
+void loop() {
+  int lightLevel = analogRead(ldrPin);
+
+  Serial.println(lightLevel);
+
+  if (lightLevel < threshold) {
+    digitalWrite(ledPin, HIGH);
+  } else {
+    digitalWrite(ledPin, LOW);
+  }
+
+  delay(200);
+}`,
+    explanation: [
+      "A0 measures the voltage produced by the LDR and 10kΩ voltage divider.",
+      "analogRead() returns a number from 0 to 1023 on a classic Uno R3.",
+      "The measured number depends on the light level and the divider wiring.",
+      "If the reading is below 400, the LED turns on.",
+      "If the reading is 400 or above, the LED turns off.",
+      "Use Serial Monitor to observe readings and choose a suitable threshold."
+    ]
+  }
+};
+
+let wires = [];
+let currentStep = 0;
+
+function loadProject() {
+  wires = [];
+  currentStep = 0;
+
+  const p = projects[document.getElementById("project").value];
+
+  document.getElementById("projectInfo").innerHTML =
+    "<h3>" + p.title + "</h3><p>" + p.description + "</p>";
+
+  document.getElementById("components").innerHTML =
+    p.parts.map(part =>
+      `<div class="tile"><h3>${part[0]}</h3><p>${part[1]}</p></div>`
+    ).join("");
+
+  document.getElementById("digitalPins").innerHTML =
+    [0,1,2,3,4,5,6,7,8,9,10,11,12,13]
+      .map(n => `<span class="pin">D${n}</span>`).join("");
+
+  document.getElementById("analogPins").innerHTML =
+    [0,1,2,3,4,5]
+      .map(n => `<span class="pin">A${n}</span>`).join("");
+
+  const from = document.getElementById("fromComponent");
+  const to = document.getElementById("toComponent");
+
+  from.innerHTML = "";
+  to.innerHTML = "";
+
+  Object.keys(p.terminals).forEach(name => {
+    from.add(new Option(name, name));
+    to.add(new Option(name, name));
+  });
+
+  from.onchange = () => updateTerminals("from");
+  to.onchange = () => updateTerminals("to");
+
+  updateTerminals("from");
+  updateTerminals("to");
+
+  document.getElementById("code").textContent = p.code;
+
+  document.getElementById("codeExplanation").innerHTML =
+    "<ol>" + p.explanation.map(x => "<li>" + x + "</li>").join("") + "</ol>";
+
+  document.getElementById("steps").innerHTML = "";
+  renderStep();
+  renderConnections();
+
+  document.getElementById("feedback").innerHTML = "";
+  document.getElementById("copyStatus").textContent = "";
+}
+
+function updateTerminals(which) {
+  const p = projects[document.getElementById("project").value];
+  const component = document.getElementById(
+    which === "from" ? "fromComponent" : "toComponent"
+  ).value;
+
+  const terminalSelect = document.getElementById(
+    which === "from" ? "fromTerminal" : "toTerminal"
+  );
+
+  terminalSelect.innerHTML = "";
+
+  (p.terminals[component] || []).forEach(t => {
+    terminalSelect.add(new Option(t, t));
+  });
+}
+
+function addConnection() {
+  const wire = {
+    a: document.getElementById("fromComponent").value,
+    at: document.getElementById("fromTerminal").value,
+    b: document.getElementById("toComponent").value,
+    bt: document.getElementById("toTerminal").value
+  };
+
+  if (wire.a === wire.b && wire.at === wire.bt) {
+    alert("Choose two different terminals.");
+    return;
+  }
+
+  wires.push(wire);
+  renderConnections();
+  document.getElementById("feedback").innerHTML = "";
+}
+
+function undoConnection() {
+  wires.pop();
+  renderConnections();
+}
+
+function resetWiring() {
+  wires = [];
+  renderConnections();
+  document.getElementById("feedback").innerHTML = "";
+}
+
+function sameWire(w, e) {
+  return (
+    (w.a === e[0] && w.at === e[1] && w.b === e[2] && w.bt === e[3]) ||
+    (w.b === e[0] && w.bt === e[1] && w.a === e[2] && w.at === e[3])
+  );
+}
+
+function renderConnections() {
+  const box = document.getElementById("connections");
+
+  if (!wires.length) {
+    box.innerHTML = "<p class='small'>No wires connected yet.</p>";
+    return;
+  }
+
+  box.innerHTML = wires.map((w,i) =>
+    `<div class="connection">
+      <b>Wire ${i+1}:</b>
+      ${w.a} (${w.at}) ↔ ${w.b} (${w.bt})
+    </div>`
+  ).join("");
+}
+
+function checkWiring() {
+  const p = projects[document.getElementById("project").value];
+  const missing = p.expected.filter(e =>
+    !wires.some(w => sameWire(w,e))
+  );
+
+  const extra = wires.filter(w =>
+    !p.expected.some(e => sameWire(w,e))
+  );
+
+  let html = "";
+
+  if (missing.length === 0 && extra.length === 0) {
+    html = "<div class='good'><h3>All expected connections entered!</h3>" +
+      "<p>Compare the physical circuit with the wiring guide before powering it.</p></div>";
+  } else {
+    html += "<div class='error'><h3>Let's learn from your wiring!</h3>";
+
+    if (missing.length) {
+      html += "<p><b>Missing expected connections:</b></p><ul>" +
+        missing.map(e => `<li>${e[0]} (${e[1]}) ↔ ${e[2]} (${e[3]})</li>`).join("") +
+        "</ul>";
+    }
+
+    if (extra.length) {
+      html += "<p><b>Connections not in the expected wiring:</b></p><ul>" +
+        extra.map(w => `<li>${w.a} (${w.at}) ↔ ${w.b} (${w.bt})</li>`).join("") +
+        "</ul><p>Check these wires against the project instructions.</p>";
+    }
+
+    html += "<p>The checker compares the connections you entered with the lesson's expected list. It cannot confirm physical breadboard placement or detect every possible electrical fault.</p></div>";
+  }
+
+  document.getElementById("feedback").innerHTML = html;
+}
+
+function renderStep() {
+  const p = projects[document.getElementById("project").value];
+  const step = p.steps[currentStep];
+
+  document.getElementById("steps").innerHTML =
+    `<div class="tile">
+      <p class="tag">STEP ${currentStep+1} OF ${p.steps.length}</p>
+      <p>${step}</p>
+    </div>`;
+}
+
+function nextStep() {
+  const p = projects[document.getElementById("project").value];
+  if (currentStep < p.steps.length-1) currentStep++;
+  renderStep();
+}
+
+function previousStep() {
+  if (currentStep > 0) currentStep--;
+  renderStep();
+}
+
+function showHelp() {
+  const help = {
+    led: "An LED has an anode and cathode. Current must flow in the correct direction. Use a series resistor to limit current.",
+    gnd: "GND is the circuit's reference and current-return connection. Components often need a complete path from the supply through the component back to ground.",
+    resistor: "A resistor limits current. Without suitable current limiting, an LED can draw too much current and become damaged.",
+    input: "An input pin lets Arduino read a digital state or, on analog-capable pins, measure a voltage. Your code decides what to do with the reading.",
+    ldr: "An LDR changes resistance with light. Combined with a fixed resistor, it creates a voltage divider that Arduino can measure through A0."
+  };
+
+  document.getElementById("helpAnswer").innerHTML =
+    "<div class='note'>" +
+    help[document.getElementById("helpTopic").value] +
+    "</div>";
+}
+
+async function copyCode() {
+  const code = document.getElementById("code").textContent;
+  const status = document.getElementById("copyStatus");
+
+  try {
+    await navigator.clipboard.writeText(code);
+    status.textContent = " Code copied!";
+  } catch (err) {
+    const area = document.createElement("textarea");
+    area.value = code;
+    document.body.appendChild(area);
+    area.select();
+    const ok = document.execCommand("copy");
+    area.remove();
+    status.textContent = ok ? " Code copied!" : " Select and copy the code manually.";
+  }
+}
+
+loadProject();
+</script>
+
+</body>
+</html>
